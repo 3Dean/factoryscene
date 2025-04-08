@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link href="vite.svg" rel="icon" type="image/svg+xml" />
+    <!-- Ensures proper scaling on mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <title>Factory Environment</title>
+    <script type="module" crossorigin src="/assets/index-CGKHonim.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CtS5zEoY.css">
+  </head>
+  <body>
+    <div id="loading-screen">
+      <div id="loader-glow">
+        <div id="loader-spinner"></div>
+        <div id="loader-text">Loading... 0%</div>
+      </div>
+    </div>
+
+    <div id="crosshair">+</div>
+
+    <!-- Audio Controls UI -->
+    <div id="audio-controls">
+      <button id="play-pause">Play Music</button>
+      <input type="range" id="volume-slider" min="0" max="100" value="70" />
+      <div id="volume-label">Volume: 70%</div>
+      <div id="credits">
+        Music:
+        <a href="https://freemusicarchive.org/music/Iliaque/" target="_blank">
+          "Nebula" by Iliaque</a
+        >
+        | CC BY 4.0
+      </div>
+    </div>
+    <!-- Desktop Tutorial -->
+    <div id="desktop-tutorial-overlay">
+      <div class="tutorial-box">
+        <h2>Welcome!</h2>
+        <p>
+          Use <strong>WASD</strong> to move,<br />
+          <strong>Mouse</strong> to look,<br />
+          <strong>Space</strong> to jump,<br />
+          and <strong>Shift</strong> to run!
+        </p>
+        <button id="close-desktop-tutorial">Got it!</button>
+      </div>
+    </div>
+    <!-- Mobile Tutorial -->
+    <div id="tutorial-overlay">
+      <div class="tutorial-box">
+        <h2>Welcome!</h2>
+        <p>
+          Use the <strong>left</strong> stick to move,<br />
+          <strong>right</strong> stick to look,<br />
+          and tap <strong>Jump</strong> to hop!
+        </p>
+        <button id="close-tutorial">Got it!</button>
+      </div>
+    </div>
+
+    <!-- Thumbsticks -->
+    <div id="left-thumbstick" class="thumbstick-zone">
+      <i class="fa-solid fa-person-walking"></i>
+    </div>
+    <button id="jump-button" class="mobile-button">
+      <i class="fa-solid fa-person-arrow-up-from-line"></i>
+    </button>
+    <div id="right-thumbstick" class="thumbstick-zone">
+      <i class="fa-solid fa-street-view"></i>
+    </div>
+
+    <!-- Desktop Tutorial Script 
+    <script>
+      
+
+      window.addEventListener("DOMContentLoaded", () => {
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+        const overlay = document.getElementById("tutorial-overlay");
+        const closeBtn = document.getElementById("close-tutorial");
+
+        if (
+          isMobile &&
+          overlay &&
+          closeBtn &&
+          !localStorage.getItem("tutorialSeen")
+        ) {
+          overlay.classList.add("visible");
+
+          closeBtn.addEventListener("click", () => {
+            overlay.classList.remove("visible");
+            localStorage.setItem("tutorialSeen", "true");
+          });
+        }
+      });
+    </script>-->
+
+    <!-- Desktop Tutorial Script -->
+    <script>
+      localStorage.removeItem("desktopTutorialSeen");
+
+      window.addEventListener("DOMContentLoaded", () => {
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+        // Desktop tutorial logic
+        const desktopOverlay = document.getElementById(
+          "desktop-tutorial-overlay"
+        );
+        const closeDesktop = document.getElementById("close-desktop-tutorial");
+
+        if (
+          !isMobile &&
+          desktopOverlay &&
+          closeDesktop &&
+          !localStorage.getItem("desktopTutorialSeen")
+        ) {
+          desktopOverlay.classList.add("visible");
+
+          closeDesktop.addEventListener("click", () => {
+            desktopOverlay.classList.remove("visible");
+            localStorage.setItem("desktopTutorialSeen", "true");
+          });
+        }
+      });
+    </script>
+    <script>
+      localStorage.removeItem("tutorialSeen"); // <-- REMOVE THIS LINE WHEN DONE TESTING
+    </script>
+  </body>
+</html>
