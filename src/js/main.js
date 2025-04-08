@@ -1,4 +1,27 @@
-import '../style.css'
+// Function to toggle light helpers visibility
+function toggleLightHelpers() {
+  if (lightHelpers.length === 0) {
+    console.log("No light helpers to toggle");
+    return;
+  }
+  
+  // Toggle visibility of all helpers
+  let currentState = null;
+  
+  // Get current state from first helper
+  if (lightHelpers[0]) {
+    currentState = lightHelpers[0].visible;
+  }
+  
+  // Toggle to opposite state
+  const newState = (currentState === null) ? true : !currentState;
+  
+  lightHelpers.forEach(helper => {
+    helper.visible = newState;
+  });
+  
+  console.log(`Light helpers ${newState ? 'shown' : 'hidden'}`);
+}import '../style.css'
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ColorManagement, SRGBColorSpace, ACESFilmicToneMapping } from 'three';
@@ -17,12 +40,16 @@ let fluffyTrees = [];
 let lastTime = 0;
 let windMaterials = [];
 let flowerParts = [];
+let interactiveModels = []; // Store interactive models
+let raycaster; // For detecting clicks on models
+let lightHelpers = []; // Store light helpers
 
 // Performance optimization: Create reusable vectors outside functions
 const cameraDirection = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
 const oldPosition = new THREE.Vector3();
 const velocity = new THREE.Vector3();
+const mouse = new THREE.Vector2(); // For interactive model clicking
 let verticalVelocity = 0;
 
 // Debug flag for development
@@ -162,6 +189,19 @@ async function loadFluffyTrees() {
   }
 }
 
+// Define artworks with their URLs
+const artworks = [
+  {
+    name: "artwork01",
+    url: "assets/models/artwork01.glb",
+    position: new THREE.Vector3(-20, 5.5, -33.2), // Positioned near one of your point lights for visibility
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, 0, 0),
+    linkUrl: "https://example.com/artwork1", // URL to open when clicked
+  }
+  // Add more artworks as needed following the same structure
+];
+
 // Main initialization function
 function init() {
   // Initialize audio system
@@ -175,6 +215,29 @@ function init() {
   // Add event listeners for audio controls
   playPauseButton.addEventListener("click", toggleAudio);
   volumeSlider.addEventListener("input", updateVolume);
+
+  // Initialize raycaster for interactive models
+  raycaster = new THREE.Raycaster();
+
+  // Add event listener for model clicks
+  window.addEventListener('click', onModelClick);
+  window.addEventListener('mousemove', onMouseMove);
+  
+  // Create a debug info element
+  if (DEBUG) {
+    const debugElement = document.createElement('div');
+    debugElement.id = 'debug-info';
+    debugElement.style.position = 'absolute';
+    debugElement.style.top = '10px';
+    debugElement.style.left = '10px';
+    debugElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    debugElement.style.color = 'white';
+    debugElement.style.padding = '10px';
+    debugElement.style.borderRadius = '5px';
+    debugElement.style.fontFamily = 'monospace';
+    debugElement.style.zIndex = '1000';
+    document.body.appendChild(debugElement);
+  }
 
   // Start the application
   start();
@@ -289,6 +352,14 @@ function setupScene() {
 }
 
 function addLighting() {
+  // Clear any existing light helpers
+  lightHelpers.forEach(helper => {
+    if (helper.parent) {
+      helper.parent.remove(helper);
+    }
+  });
+  lightHelpers = [];
+  
   // Ambient light
   const ambientLight = new THREE.AmbientLight(0xf7c6a1, 0.5);
   scene.add(ambientLight);
@@ -297,6 +368,11 @@ function addLighting() {
   const directionalLight = new THREE.DirectionalLight(0xa1cff7, 10);
   directionalLight.position.set(0, 10, 0);
   scene.add(directionalLight);
+  
+  // Add directional light helper
+  const directionalHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
+  scene.add(directionalHelper);
+  lightHelpers.push(directionalHelper);
 
   // Create spotlight 1
   const spotLight = new THREE.SpotLight(0xffffff, 600);
@@ -320,6 +396,11 @@ function addLighting() {
   scene.add(spotLight);
   scene.add(spotLight.target);
   
+  // Add spotlight helper
+  const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+  scene.add(spotLightHelper);
+  lightHelpers.push(spotLightHelper);
+  
   // Create spotlight 2
   const spotLight2 = new THREE.SpotLight(0xffffff, 600);
   spotLight2.position.set(-11.0, 31, 25);
@@ -342,6 +423,11 @@ function addLighting() {
   scene.add(spotLight2);
   scene.add(spotLight2.target);
   
+  // Add spotlight helper
+  const spotLight2Helper = new THREE.SpotLightHelper(spotLight2);
+  scene.add(spotLight2Helper);
+  lightHelpers.push(spotLight2Helper);
+  
   // Create spotlight 3
   const spotLight3 = new THREE.SpotLight(0xffffff, 600);
   spotLight3.position.set(-11.0, 31, -25);
@@ -363,8 +449,13 @@ function addLighting() {
   
   scene.add(spotLight3);
   scene.add(spotLight3.target);
+  
+  // Add spotlight helper
+  const spotLight3Helper = new THREE.SpotLightHelper(spotLight3);
+  scene.add(spotLight3Helper);
+  lightHelpers.push(spotLight3Helper);
 
-  // Point lights
+  // Point lights (original array for color cycling)
   const positions = [
     new THREE.Vector3(-9, 5, 0),     // Light 1
     //new THREE.Vector3(-6.7, 5, -3.36),     // Light 2
@@ -378,6 +469,99 @@ function addLighting() {
     scene.add(light);
     pointLights.push(light);
     hues.push(Math.random()); // optional: gives each light a different starting color
+    
+    // Add point light helper
+    const pointLightHelper = new THREE.PointLightHelper(light, 1);
+    scene.add(pointLightHelper);
+    lightHelpers.push(pointLightHelper);
+  });
+  
+  // NEW: Add standalone point lights (not part of the color cycling array)
+  // Method 1: Static colored light
+  /* const staticLight = new THREE.PointLight(0x00ffff, 250, 40, 2); // Cyan light
+  staticLight.position.set(20, 5, 15);
+  scene.add(staticLight);
+  
+  // Add helper for static light
+  const staticLightHelper = new THREE.PointLightHelper(staticLight, 1);
+  scene.add(staticLightHelper);
+  lightHelpers.push(staticLightHelper); */
+  
+  // Method 2: Custom cycling light with its own parameters
+  const customLight = new THREE.PointLight(0xff00ff, 200, 60, 2); // Start with magenta
+  customLight.position.set(-26, 8, -13);
+  customLight.userData = {
+    cycleSpeed: 0.002, // Faster color cycling
+    hue: Math.random(), // Random starting hue
+    saturation: 0.9,
+    lightness: 0.7
+  };
+  scene.add(customLight);
+  window.customLights = window.customLights || [];
+  window.customLights.push(customLight);
+  
+  // Add helper for custom light
+  const customLightHelper = new THREE.PointLightHelper(customLight, 1);
+  scene.add(customLightHelper);
+  lightHelpers.push(customLightHelper);
+  
+  // Method 3: Blinking light
+  /* const blinkingLight = new THREE.PointLight(0xffaa00, 150, 30, 2); // Orange light
+  blinkingLight.position.set(0, 1, 0);
+  blinkingLight.userData = {
+    blinkSpeed: 2.0, // Blinks per second
+    minIntensity: 50,
+    maxIntensity: 300,
+    originalIntensity: 150
+  };
+  scene.add(blinkingLight);
+  window.blinkingLights = window.blinkingLights || [];
+  window.blinkingLights.push(blinkingLight);
+  
+  // Add helper for blinking light
+  const blinkingLightHelper = new THREE.PointLightHelper(blinkingLight, 1);
+  scene.add(blinkingLightHelper);
+  lightHelpers.push(blinkingLightHelper); */
+    
+}
+
+  // Method 4: Add a light to track an interactive artwork
+// First, we add the light during scene setup
+function addArtworkLights(artworksData) {
+  // Check if artworksData is defined, otherwise use the global artworks array
+  const artworkItems = artworksData || artworks;
+  
+  if (artworkItems && artworkItems.length > 0) {
+    const artworkData = artworkItems[0];
+    const artworkLight = new THREE.PointLight(0xffffff, 100, 5, 2);
+    
+    // Position light above the artwork
+    artworkLight.position.set(
+      artworkData.position.x, 
+      artworkData.position.y,
+      artworkData.position.z,
+    );
+    scene.add(artworkLight);
+
+    // Store in global array for updates
+    window.artworkLights = window.artworkLights || [];
+    window.artworkLights.push({
+      light: artworkLight,
+      artworkIndex: 0  // Reference to first artwork
+    });
+    
+    // Add helper to visualize the light
+    const artworkLightHelper = new THREE.PointLightHelper(artworkLight, 1);
+    scene.add(artworkLightHelper);
+    lightHelpers.push(artworkLightHelper);
+
+    console.log("Artwork light added for:", artworkData.name);
+  } else {
+    console.log("No artwork data available for lights");
+  }
+  // Hide all helpers initially
+  lightHelpers.forEach(helper => {
+    helper.visible = false;
   });
 }
 
@@ -503,6 +687,14 @@ function setupPlayer() {
   setupTeleport();
 }
 
+// Helper function to log player position (for easier artwork placement)
+function logPlayerPosition() {
+  if (!player) return;
+  
+  console.log(`Player position: [${player.position.x.toFixed(2)}, ${player.position.y.toFixed(2)}, ${player.position.z.toFixed(2)}]`);
+  console.log(`Camera rotation: [${camera.rotation.x.toFixed(2)}, ${camera.rotation.y.toFixed(2)}, ${camera.rotation.z.toFixed(2)}]`);
+}
+
 function onKeyDown(event) {
   switch (event.code) {
     case "KeyW": keys.forward = true; break;
@@ -519,6 +711,8 @@ function onKeyDown(event) {
       break;
     case "KeyT": toggleNavmeshVisibility(); break;
     case "KeyM": toggleAudio(); break;
+    case "KeyP": logPlayerPosition(); break; // Add P key to log position
+    case "KeyL": toggleLightHelpers(); break; // Add L key to toggle light helpers
   }
 }
 
@@ -538,14 +732,139 @@ function onPointerLockChange() {
 }
 
 function onMouseMove(event) {
-  if (!mouseEnabled) return;
-  const movementX = event.movementX || 0;
-  const movementY = event.movementY || 0;
-  euler.y -= movementX * 0.002;
-  euler.x -= movementY * 0.002;
-  euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
-  camera.rotation.copy(euler);
-  playerDirection.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  // For camera rotation when pointer is locked
+  if (mouseEnabled) {
+    const movementX = event.movementX || 0;
+    const movementY = event.movementY || 0;
+    euler.y -= movementX * 0.002;
+    euler.x -= movementY * 0.002;
+    euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+    camera.rotation.copy(euler);
+    playerDirection.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    return;
+  }
+  
+  // For interactive model hover effect
+  // Calculate mouse position in normalized device coordinates (-1 to +1)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  
+  // Check for hover
+  checkInteractiveModelHover();
+}
+
+// Function to check if mouse is hovering over an interactive model
+// Function to check if mouse is hovering over an interactive model
+function checkInteractiveModelHover() {
+  if (!raycaster || !camera || interactiveModels.length === 0) return;
+  
+  // Update the raycaster with the camera and mouse position
+  raycaster.setFromCamera(mouse, camera);
+  
+  // Calculate objects intersecting the picking ray
+  const intersects = raycaster.intersectObjects(interactiveModels, true);
+  
+  // Reset all models to their original state
+  interactiveModels.forEach(model => {
+    model.traverse(child => {
+      if (child.isMesh && child.userData.originalMaterial) {
+        if (child.userData.isHighlighted) {
+          // Only change emissive property back to original
+          child.material.emissive.set(0, 0, 0);
+          child.material.emissiveIntensity = 0;
+          child.userData.isHighlighted = false;
+        }
+      }
+    });
+  });
+  
+  // Reset cursor
+  document.body.style.cursor = 'auto';
+  
+  // Highlight the first intersected object
+  if (intersects.length > 0) {
+    const object = intersects[0].object;
+    let interactiveModel = object;
+    
+    // Find the top-level interactive model
+    while (interactiveModel.parent && !interactiveModel.userData.isInteractiveModel) {
+      interactiveModel = interactiveModel.parent;
+    }
+    
+    if (interactiveModel.userData.isInteractiveModel) {
+      // Change cursor to indicate clickable
+      document.body.style.cursor = 'pointer';
+      
+      // Highlight using emissive property
+      interactiveModel.traverse(child => {
+        if (child.isMesh) {
+          // Store original material if not already stored
+          if (!child.userData.originalMaterial) {
+            child.userData.originalMaterial = child.material;
+          }
+          
+          // Set emissive color (using a nice blue glow)
+          child.material.emissive.set(0.2, 0.5, 1.0);
+          child.material.emissiveIntensity = 0.5; // Adjust intensity as needed
+          child.userData.isHighlighted = true;
+        }
+      });
+    }
+  }
+}
+
+// Function to handle clicks on interactive models
+function onModelClick(event) {
+  // Update the mouse position
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  
+  // Update the picking ray
+  raycaster.setFromCamera(mouse, camera);
+  
+  // Find intersections
+  const intersects = raycaster.intersectObjects(interactiveModels, true);
+  
+  if (intersects.length > 0) {
+    const object = intersects[0].object;
+    let interactiveModel = object;
+    
+    // Find the top-level interactive model
+    while (interactiveModel.parent && !interactiveModel.userData.isInteractiveModel) {
+      interactiveModel = interactiveModel.parent;
+    }
+    
+    if (interactiveModel.userData.isInteractiveModel && interactiveModel.userData.linkUrl) {
+      // Store the URL we want to open
+      const urlToOpen = interactiveModel.userData.linkUrl;
+      
+      // Stop event propagation to prevent other click handlers
+      event.stopPropagation();
+      
+      // Check if pointer is locked
+      if (document.pointerLockElement === renderer.domElement) {
+        // First exit pointer lock
+        document.exitPointerLock();
+        
+        // Listen for the pointerlockchange event once
+        const handlePointerLockChange = function() {
+          // Only proceed if pointer lock is truly exited
+          if (document.pointerLockElement === null) {
+            // Remove the event listener to avoid multiple calls
+            document.removeEventListener('pointerlockchange', handlePointerLockChange);
+            // Now it's safe to open the URL
+            window.open(urlToOpen, '_blank');
+          }
+        };
+        
+        // Add the event listener
+        document.addEventListener('pointerlockchange', handlePointerLockChange, { once: true });
+      } else {
+        // If pointer lock is not active, open URL directly
+        window.open(urlToOpen, '_blank');
+      }
+    }
+  }
 }
 
 // Mobile touch controls for movement and camera rotation
@@ -739,6 +1058,42 @@ function animateGrass(time) {
   });
 }
 
+// Debug function to update information about interactive models
+function updateDebugInfo() {
+  if (!DEBUG) return;
+  
+  const debugElement = document.getElementById('debug-info');
+  if (!debugElement) return;
+  
+  let content = '<strong>Interactive Models:</strong><br>';
+  
+  if (interactiveModels.length === 0) {
+    content += 'No models loaded yet.';
+  } else {
+    interactiveModels.forEach((model, index) => {
+      content += `<b>${index + 1}. ${model.userData.name || 'Unnamed'}</b><br>`;
+      content += `Position: (${model.position.x.toFixed(2)}, ${model.position.y.toFixed(2)}, ${model.position.z.toFixed(2)})<br>`;
+      content += `URL: ${model.userData.linkUrl}<br>`;
+      
+      // Count meshes
+      let meshCount = 0;
+      model.traverse(child => {
+        if (child.isMesh) meshCount++;
+      });
+      
+      content += `Meshes: ${meshCount}<br><br>`;
+    });
+  }
+  
+  // Add mouse position
+  content += `<b>Mouse:</b> X: ${mouse.x.toFixed(2)}, Y: ${mouse.y.toFixed(2)}<br>`;
+  
+  // Add camera position
+  content += `<b>Camera:</b> (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})<br>`;
+  
+  debugElement.innerHTML = content;
+}
+
 function animate(time) {
   // Calculate delta time
   const now = performance.now() / 1000; // Convert to seconds
@@ -757,12 +1112,84 @@ function animate(time) {
   // Update tree animations
   fluffyTrees.forEach(tree => tree.update(deltaTime));
 
-  // Color cycle each light
+  // Check interactive model hover if not in pointer lock mode
+  if (!mouseEnabled && interactiveModels.length > 0) {
+    checkInteractiveModelHover();
+  }
+  
+  // Update debug info
+  if (DEBUG) {
+    updateDebugInfo();
+  }
+
+  // Update original color cycling point lights
   pointLights.forEach((light, i) => {
     hues[i] += 0.001; // control speed here
     if (hues[i] > 1) hues[i] = 0;
     light.color.setHSL(hues[i], 1, 0.5);
   });
+  
+  // Update custom cycling lights
+  if (window.customLights && window.customLights.length > 0) {
+    window.customLights.forEach(light => {
+      if (light.userData) {
+        light.userData.hue += light.userData.cycleSpeed || 0.001;
+        if (light.userData.hue > 1) light.userData.hue = 0;
+        light.color.setHSL(
+          light.userData.hue,
+          light.userData.saturation || 1.0,
+          light.userData.lightness || 0.5
+        );
+      }
+    });
+  }
+  
+  // Update blinking lights
+  if (window.blinkingLights && window.blinkingLights.length > 0) {
+    window.blinkingLights.forEach(light => {
+      if (light.userData) {
+        const { blinkSpeed, minIntensity, maxIntensity } = light.userData;
+        // Create a sine wave pattern for smooth blinking
+        const intensityFactor = (Math.sin(time * 0.001 * blinkSpeed * Math.PI) + 1) * 0.5; // 0 to 1
+        const newIntensity = minIntensity + intensityFactor * (maxIntensity - minIntensity);
+        light.intensity = newIntensity;
+      }
+    });
+  }
+  
+  // Update artwork tracking lights
+  if (window.artworkLights && window.artworkLights.length > 0) {
+    window.artworkLights.forEach(item => {
+      if (artworks[item.artworkIndex] && interactiveModels[item.artworkIndex]) {
+        // Get current artwork position
+        const artworkPos = interactiveModels[item.artworkIndex].position;
+        // Position light above the artwork
+        item.light.position.set(artworkPos.x, artworkPos.y + 1, artworkPos.z + 2);
+        
+        // Optional: create a spotlight effect by changing light properties
+        // when mouse is hovering over the artwork
+        const isArtworkHovered = document.body.style.cursor === 'pointer';
+        if (isArtworkHovered) {
+          item.light.intensity = 200; // Brighter when hovered
+          // Create subtle pulsing effect
+          const pulse = (Math.sin(time * 0.003) + 1) * 0.5; // 0 to 1
+          item.light.distance = 15 + pulse * 10; // Pulse the light radius
+        } else {
+          item.light.intensity = 100; // Normal brightness
+          item.light.distance = 15; // Normal radius
+        }
+      }
+      
+    });
+    
+  }
+
+    // Update light helpers
+    lightHelpers.forEach(helper => {
+      if (helper.update) {
+        helper.update();
+      }
+    });
   
   // Audio visualization
   if (particleSystem && analyser) {
@@ -1032,12 +1459,33 @@ function cleanup() {
   document.removeEventListener("keyup", onKeyUp);
   document.removeEventListener("pointerlockchange", onPointerLockChange);
   document.removeEventListener("mousemove", onMouseMove);
+  window.removeEventListener("click", onModelClick);
+  
+  // Reset cursor
+  document.body.style.cursor = 'auto';
   
   // Stop audio if playing
   if (audioSource) {
     audioSource.stop();
     audioSource = null;
   }
+  
+  // Clean up interactive models
+  interactiveModels.forEach(model => {
+    scene.remove(model);
+  });
+  interactiveModels = [];
+
+    // Clean up light helpers
+    lightHelpers.forEach(helper => {
+      scene.remove(helper);
+    });
+    lightHelpers = [];
+  
+  // Clean up additional light references
+  window.customLights = [];
+  window.blinkingLights = [];
+  window.artworkLights = [];
   
   // Dispose of geometries, materials, textures
   scene.traverse(object => {
@@ -1059,12 +1507,95 @@ function cleanup() {
   console.log("Application resources cleaned up");
 }
 
+// Function to load interactive artwork models
+function loadArtworkModels() {
+  console.log("Loading interactive artwork models...");
+  
+  const loader = new GLTFLoader();
+  
+  artworks.forEach(artwork => {
+    loader.load(
+      artwork.url,
+      function(gltf) {
+        const model = gltf.scene;
+        
+        // Set position, scale, and rotation
+        model.position.copy(artwork.position);
+        model.scale.copy(artwork.scale);
+        model.rotation.copy(artwork.rotation);
+        
+        // Mark as interactive model and store link URL
+        model.userData.isInteractiveModel = true;
+        model.userData.linkUrl = artwork.linkUrl;
+        model.userData.name = artwork.name;
+        
+        // Add to scene and track in our array
+        scene.add(model);
+        interactiveModels.push(model);
+        
+        console.log(`Interactive model "${artwork.name}" loaded and placed at ${artwork.position.x}, ${artwork.position.y}, ${artwork.position.z}`);
+        
+        // Setup material for all meshes in the model
+        model.traverse(child => {
+          if (child.isMesh) {
+            // Ensure the mesh casts and receives shadows
+            child.castShadow = true;
+            child.receiveShadow = true;
+            
+            // Make sure the material is properly set for emissive highlighting
+            if (child.material && !child.material.isMeshStandardMaterial) {
+              // If not already a MeshStandardMaterial, convert it
+              const stdMaterial = new THREE.MeshStandardMaterial({
+                map: child.material.map,
+                color: child.material.color ? child.material.color.clone() : 0xffffff,
+                roughness: 0.7,
+                metalness: 0.3
+              });
+              
+              // Store and apply the new material
+              child.userData.originalMaterial = stdMaterial;
+              child.material = stdMaterial;
+            } else {
+              // Just store reference to the original material
+              child.userData.originalMaterial = child.material;
+            }
+            
+            child.userData.isHighlighted = false;
+          }
+        });
+      },
+      function(xhr) {
+        console.log(`${artwork.name}: ${Math.round((xhr.loaded / xhr.total) * 100)}% loaded`);
+      },
+      function(error) {
+        console.error(`Error loading ${artwork.name}:`, error);
+      }
+    );
+  });
+}
+
 // Main start function
 function start() {
   setupScene();
   setupPlayer();
   loadModels();
   loadFluffyTrees();
+  loadArtworkModels(); // Load the interactive artwork models
+
+// Wait until models are loaded before adding lights
+setTimeout(() => {
+  try {
+    // Only call if the function exists
+    if (typeof addArtworkLights === 'function') {
+      addArtworkLights(artworks);
+      console.log("Artwork lights added successfully");
+    } else {
+      console.warn("addArtworkLights function not found");
+    }
+  } catch (error) {
+    console.error("Error adding artwork lights:", error);
+  }
+}, 1000); // Wait 1 second to ensure models are loaded
   
   // Tutorial Overlay
   if (isMobile) {
