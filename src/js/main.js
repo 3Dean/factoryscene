@@ -198,8 +198,15 @@ const artworks = [
     scale: new THREE.Vector3(1, 1, 1),
     rotation: new THREE.Euler(0, 0, 0),
     linkUrl: "https://example.com/artwork1", // URL to open when clicked
+  },
+  {
+    name: "artwork02",
+    url: "assets/models/artwork02.glb",
+    position: new THREE.Vector3(-31.19, 5.5, -33.2), // Positioned near one of your point lights for visibility
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, 0, 0),
+    linkUrl: "https://example.com/artwork1", // URL to open when clicked
   }
-  // Add more artworks as needed following the same structure
 ];
 
 // Main initialization function
@@ -525,44 +532,141 @@ function addLighting() {
     
 }
 
-  // Method 4: Add a light to track an interactive artwork
-// First, we add the light during scene setup
+ // Function to add lights to all interactive artworks
 function addArtworkLights(artworksData) {
   // Check if artworksData is defined, otherwise use the global artworks array
   const artworkItems = artworksData || artworks;
   
-  if (artworkItems && artworkItems.length > 0) {
-    const artworkData = artworkItems[0];
-    const artworkLight = new THREE.PointLight(0xffffff, 100, 5, 2);
-    
-    // Position light above the artwork
-    artworkLight.position.set(
-      artworkData.position.x, 
-      artworkData.position.y,
-      artworkData.position.z,
-    );
-    scene.add(artworkLight);
-
-    // Store in global array for updates
-    window.artworkLights = window.artworkLights || [];
-    window.artworkLights.push({
-      light: artworkLight,
-      artworkIndex: 0  // Reference to first artwork
+  // Clear any existing artwork lights
+  if (window.artworkLights && window.artworkLights.length > 0) {
+    window.artworkLights.forEach(item => {
+      if (item.light && item.light.parent) {
+        item.light.parent.remove(item.light);
+      }
+      if (item.helper && item.helper.parent) {
+        item.helper.parent.remove(item.helper);
+      }
     });
-    
-    // Add helper to visualize the light
+  }
+  
+  // Initialize or reset the artwork lights array
+  window.artworkLights = [];
+  
+  // Create a light for each artwork
+  if (artworkItems && artworkItems.length > 0) {
+    artworkItems.forEach((artworkData, index) => {
+      // Create a point light for this artwork
+      const artworkLight = new THREE.PointLight(0xffffff, 100, 5, 2);
+      
+      // Position light relative to the artwork
+      artworkLight.position.set(
+        artworkData.position.x, 
+        artworkData.position.y + 1, // Position slightly above artwork
+        artworkData.position.z
+      );
+      
+      // Add additional properties to the light (optional)
+      artworkLight.userData = {
+        artworkIndex: index,
+        artworkName: artworkData.name,
+        // You can add custom lighting properties per artwork
+        pulseSpeed: 0.003 + (index * 0.001), // Different pulse speed for each artwork
+        minIntensity: 80,
+        maxIntensity: 150
+      };
+      
+      // Add the light to the scene
+      scene.add(artworkLight);
+
+    // Create helper for this light
     const artworkLightHelper = new THREE.PointLightHelper(artworkLight, 1);
     scene.add(artworkLightHelper);
     lightHelpers.push(artworkLightHelper);
-
-    console.log("Artwork light added for:", artworkData.name);
-  } else {
-    console.log("No artwork data available for lights");
-  }
-  // Hide all helpers initially
-  lightHelpers.forEach(helper => {
-    helper.visible = false;
+    
+    // Store reference to both light and helper
+    window.artworkLights.push({
+      light: artworkLight,
+      helper: artworkLightHelper,
+      artworkIndex: index
+    });
+    
+    console.log(`Artwork light added for: ${artworkData.name} (index: ${index})`);
   });
+  
+  console.log(`Created lights for ${window.artworkLights.length} artworks`);
+} else {
+  console.log("No artwork data available for lights");
+}
+
+// Hide all helpers initially
+lightHelpers.forEach(helper => {
+  helper.visible = false;
+});
+}
+
+function updateArtworkLights(time) {
+  if (window.artworkLights && window.artworkLights.length > 0) {
+    window.artworkLights.forEach(item => {
+      if (artworks[item.artworkIndex] && interactiveModels[item.artworkIndex]) {
+        const artworkPos = interactiveModels[item.artworkIndex].position;
+        const light = item.light;
+        
+        // Position light relative to the artwork
+        light.position.set(
+          artworkPos.x, 
+          artworkPos.y + 2, 
+          artworkPos.z + 1
+        );
+        
+        // Check if this specific artwork is being hovered
+        let isThisArtworkHovered = false;
+        
+        // Only check hover if we're not in pointer lock mode
+        if (!mouseEnabled && document.body.style.cursor === 'pointer') {
+          // We're hovering something, let's see if it's this artwork
+          raycaster.setFromCamera(mouse, camera);
+          const intersects = raycaster.intersectObjects(interactiveModels, true);
+          
+          if (intersects.length > 0) {
+            let hitObject = intersects[0].object;
+            let hitModel = hitObject;
+            
+            // Find the top-level model
+            while (hitModel.parent && !hitModel.parent.userData.isInteractiveModel) {
+              hitModel = hitModel.parent;
+            }
+            
+            // If we found a parent with isInteractiveModel
+            if (hitModel.parent && hitModel.parent.userData.isInteractiveModel) {
+              const hitIndex = interactiveModels.indexOf(hitModel.parent);
+              isThisArtworkHovered = (hitIndex === item.artworkIndex);
+            }
+          }
+        }
+        
+        // Apply lighting effects based on hover state
+        if (isThisArtworkHovered) {
+          // Brighter when this specific artwork is hovered
+          light.intensity = 200;
+          
+          // Create pulsing effect using time
+          const pulseSpeed = light.userData?.pulseSpeed || 0.003;
+          const pulse = (Math.sin(time * pulseSpeed) + 1) * 0.5; // 0 to 1
+          light.distance = 5 + pulse * 5; // Pulse the light radius
+        } else {
+          // Normal state (not being hovered)
+          light.intensity = light.userData?.minIntensity || 100;
+          light.distance = 5;
+          light.color.set(0xffffff); // Reset to white
+        }
+        
+        // Update helper position
+        if (item.helper && item.helper.update) {
+          item.helper.update();
+        }
+      }
+    });
+  }
 }
 
 function addParticles() {
@@ -754,7 +858,6 @@ function onMouseMove(event) {
 }
 
 // Function to check if mouse is hovering over an interactive model
-// Function to check if mouse is hovering over an interactive model
 function checkInteractiveModelHover() {
   if (!raycaster || !camera || interactiveModels.length === 0) return;
   
@@ -767,13 +870,17 @@ function checkInteractiveModelHover() {
   // Reset all models to their original state
   interactiveModels.forEach(model => {
     model.traverse(child => {
-      if (child.isMesh && child.userData.originalMaterial) {
-        if (child.userData.isHighlighted) {
-          // Only change emissive property back to original
+      // Only affect the frame mesh, not the artwork image
+      if (child.isMesh && child.name === 'frame' && child.userData.isHighlighted) {
+        // Only change emissive property back to original
+        if (child.userData.originalEmissive) {
+          child.material.emissive.copy(child.userData.originalEmissive);
+          child.material.emissiveIntensity = child.userData.originalEmissiveIntensity || 0;
+        } else {
           child.material.emissive.set(0, 0, 0);
           child.material.emissiveIntensity = 0;
-          child.userData.isHighlighted = false;
         }
+        child.userData.isHighlighted = false;
       }
     });
   });
@@ -795,12 +902,13 @@ function checkInteractiveModelHover() {
       // Change cursor to indicate clickable
       document.body.style.cursor = 'pointer';
       
-      // Highlight using emissive property
+      // Highlight only the frame mesh
       interactiveModel.traverse(child => {
-        if (child.isMesh) {
-          // Store original material if not already stored
-          if (!child.userData.originalMaterial) {
-            child.userData.originalMaterial = child.material;
+        if (child.isMesh && child.name === 'frame') {
+          // Store original emissive properties if not already stored
+          if (!child.userData.originalEmissive && child.material) {
+            child.userData.originalEmissive = child.material.emissive.clone();
+            child.userData.originalEmissiveIntensity = child.material.emissiveIntensity;
           }
           
           // Set emissive color (using a nice blue glow)
@@ -1158,31 +1266,7 @@ function animate(time) {
   }
   
   // Update artwork tracking lights
-  if (window.artworkLights && window.artworkLights.length > 0) {
-    window.artworkLights.forEach(item => {
-      if (artworks[item.artworkIndex] && interactiveModels[item.artworkIndex]) {
-        // Get current artwork position
-        const artworkPos = interactiveModels[item.artworkIndex].position;
-        // Position light above the artwork
-        item.light.position.set(artworkPos.x, artworkPos.y + 1, artworkPos.z + 2);
-        
-        // Optional: create a spotlight effect by changing light properties
-        // when mouse is hovering over the artwork
-        const isArtworkHovered = document.body.style.cursor === 'pointer';
-        if (isArtworkHovered) {
-          item.light.intensity = 200; // Brighter when hovered
-          // Create subtle pulsing effect
-          const pulse = (Math.sin(time * 0.003) + 1) * 0.5; // 0 to 1
-          item.light.distance = 15 + pulse * 10; // Pulse the light radius
-        } else {
-          item.light.intensity = 100; // Normal brightness
-          item.light.distance = 15; // Normal radius
-        }
-      }
-      
-    });
-    
-  }
+  updateArtworkLights(time);
 
     // Update light helpers
     lightHelpers.forEach(helper => {
@@ -1535,29 +1619,75 @@ function loadArtworkModels() {
         
         console.log(`Interactive model "${artwork.name}" loaded and placed at ${artwork.position.x}, ${artwork.position.y}, ${artwork.position.z}`);
         
-        // Setup material for all meshes in the model
+        // Setup materials based on mesh name
         model.traverse(child => {
           if (child.isMesh) {
             // Ensure the mesh casts and receives shadows
             child.castShadow = true;
             child.receiveShadow = true;
             
-            // Make sure the material is properly set for emissive highlighting
-            if (child.material && !child.material.isMeshStandardMaterial) {
-              // If not already a MeshStandardMaterial, convert it
-              const stdMaterial = new THREE.MeshStandardMaterial({
-                map: child.material.map,
-                color: child.material.color ? child.material.color.clone() : 0xffffff,
-                roughness: 0.7,
-                metalness: 0.3
-              });
+            console.log(`Found mesh: ${child.name} in model ${artwork.name}`);
+            
+            // Different handling for different mesh types
+            if (child.name === 'artimage') {
+              // This is the artwork image - preserve its original material
+              // Make sure it's a MeshStandardMaterial for emissive to work
+              if (child.material && !child.material.isMeshStandardMaterial) {
+                // Convert to MeshStandardMaterial while preserving properties
+                const stdMaterial = new THREE.MeshStandardMaterial({
+                  map: child.material.map,
+                  color: child.material.color ? child.material.color.clone() : 0xffffff,
+                  roughness: 0.7,
+                  metalness: 0.3,
+                  emissive: child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0x000000),
+                  emissiveIntensity: child.material.emissiveIntensity || 0
+                });
+                
+                child.material = stdMaterial;
+              }
               
-              // Store and apply the new material
-              child.userData.originalMaterial = stdMaterial;
-              child.material = stdMaterial;
-            } else {
-              // Just store reference to the original material
+              // Store reference to the art material
               child.userData.originalMaterial = child.material;
+              // Mark it as the artwork mesh
+              child.userData.isArtworkMesh = true;
+            } 
+            else if (child.name === 'frame') {
+              // This is the frame - we'll highlight this on hover
+              // Make sure it's a MeshStandardMaterial
+              if (child.material && !child.material.isMeshStandardMaterial) {
+                const stdMaterial = new THREE.MeshStandardMaterial({
+                  map: child.material.map,
+                  color: child.material.color ? child.material.color.clone() : 0x333333,
+                  roughness: 0.5,
+                  metalness: 0.8,
+                  emissive: new THREE.Color(0x000000),
+                  emissiveIntensity: 0
+                });
+                
+                child.material = stdMaterial;
+              }
+              
+              // Store original emissive for the frame
+              if (child.material) {
+                child.userData.originalEmissive = child.material.emissive.clone();
+                child.userData.originalEmissiveIntensity = child.material.emissiveIntensity;
+              }
+              
+              // Mark it as a frame mesh
+              child.userData.isFrameMesh = true;
+            }
+            else {
+              // Any other mesh - standard treatment
+              if (child.material && !child.material.isMeshStandardMaterial) {
+                const stdMaterial = new THREE.MeshStandardMaterial({
+                  map: child.material.map,
+                  color: child.material.color ? child.material.color.clone() : 0xffffff,
+                  roughness: 0.7,
+                  metalness: 0.3
+                });
+                
+                child.material = stdMaterial;
+              }
             }
             
             child.userData.isHighlighted = false;
@@ -1574,6 +1704,7 @@ function loadArtworkModels() {
   });
 }
 
+
 // Main start function
 function start() {
   setupScene();
@@ -1585,17 +1716,12 @@ function start() {
 // Wait until models are loaded before adding lights
 setTimeout(() => {
   try {
-    // Only call if the function exists
-    if (typeof addArtworkLights === 'function') {
-      addArtworkLights(artworks);
-      console.log("Artwork lights added successfully");
-    } else {
-      console.warn("addArtworkLights function not found");
-    }
+    addArtworkLights(artworks);
+    console.log("Artwork lights added successfully");
   } catch (error) {
     console.error("Error adding artwork lights:", error);
   }
-}, 1000); // Wait 1 second to ensure models are loaded
+}, 2000); // Wait 2 seconds to ensure models are loaded
   
   // Tutorial Overlay
   if (isMobile) {
