@@ -199,7 +199,7 @@ const artworks = [
     rotation: new THREE.Euler(0, 0, 0),
     linkUrl: "https://nearhub.club/hLyuPmW/", // URL to open when clicked
   },
-  {
+  /* {
     name: "artwork02",
     url: "assets/models/artwork02.glb",
     position: new THREE.Vector3(-31.19, 5.5, -33.2),
@@ -270,7 +270,7 @@ const artworks = [
     scale: new THREE.Vector3(1, 1, 1),
     rotation: new THREE.Euler(0, -Math.PI / 2, 0),
     linkUrl: "https://example.com/artwork1", // URL to open when clicked
-  }
+  } */
 ];
 
 // Main initialization function
