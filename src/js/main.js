@@ -194,17 +194,81 @@ const artworks = [
   {
     name: "artwork01",
     url: "assets/models/artwork01.glb",
-    position: new THREE.Vector3(-20, 5.5, -33.2), // Positioned near one of your point lights for visibility
+    position: new THREE.Vector3(-20, 5.5, -33.2),
     scale: new THREE.Vector3(1, 1, 1),
     rotation: new THREE.Euler(0, 0, 0),
-    linkUrl: "https://example.com/artwork1", // URL to open when clicked
+    linkUrl: "https://nearhub.club/hLyuPmW/", // URL to open when clicked
   },
   {
     name: "artwork02",
     url: "assets/models/artwork02.glb",
-    position: new THREE.Vector3(-31.19, 5.5, -33.2), // Positioned near one of your point lights for visibility
+    position: new THREE.Vector3(-31.19, 5.5, -33.2),
     scale: new THREE.Vector3(1, 1, 1),
     rotation: new THREE.Euler(0, 0, 0),
+    linkUrl: "https://nearhub.club/kcPYd6i/south-east-asian-hub", // URL to open when clicked
+  },
+  {
+    name: "artwork03",
+    url: "assets/models/artwork03.glb",
+    position: new THREE.Vector3(-34.8, 5.5, -28.9),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI / 2, 0),
+    linkUrl: "https://nearhub.club/i2VFvT8/mutidao-amphitheater", // URL to open when clicked
+  },
+  {
+    name: "artwork04",
+    url: "assets/models/artwork04.glb",
+    position: new THREE.Vector3(-34.8, 5.5, -21.58),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI / 2, 0),
+    linkUrl: "https://nearhub.club/S5oDAd5/", // URL to open when clicked
+  },
+  {
+    name: "artwork05",
+    url: "assets/models/artwork05.glb",
+    position: new THREE.Vector3(-34.8, 5.5, -14.51),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI / 2, 0),
+    linkUrl: "https://nearhub.club/kGRfWy6/adam-4-artists", // URL to open when clicked
+  },
+  {
+    name: "artwork06",
+    url: "assets/models/artwork06.glb",
+    position: new THREE.Vector3(-34.8, 5.5, -7.25),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI / 2, 0),
+    linkUrl: "https://nearhub.club/n8avADG/near-at-ethdenver-23", // URL to open when clicked
+  },
+  {
+    name: "artwork07",
+    url: "assets/models/artwork07.glb",
+    position: new THREE.Vector3(-34.8, 5.5, 0.2),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI / 2, 0),
+    linkUrl: "https://nearhub.club/hoXFRGi/metaverseradio-studio", // URL to open when clicked
+  },
+  {
+    name: "artwork08",
+    url: "assets/models/artwork08.glb",
+    position: new THREE.Vector3(-30.85, 5.5, 4.35),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI, 0),
+    linkUrl: "https://nearhub.club/jJQy3wn/collegelasalle-signature2024", // URL to open when clicked
+  },
+  {
+    name: "artwork09",
+    url: "assets/models/artwork09.glb",
+    position: new THREE.Vector3(-20.25, 5.5, 4.35),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, Math.PI, 0),
+    linkUrl: "https://nearhub.club/oZcg4pC/thespians-hub", // URL to open when clicked
+  },
+  {
+    name: "artwork10",
+    url: "assets/models/artwork10.glb",
+    position: new THREE.Vector3(-16.52, 5.5, -28.3),
+    scale: new THREE.Vector3(1, 1, 1),
+    rotation: new THREE.Euler(0, -Math.PI / 2, 0),
     linkUrl: "https://example.com/artwork1", // URL to open when clicked
   }
 ];
@@ -532,7 +596,7 @@ function addLighting() {
     
 }
 
- // Function to add lights to all interactive artworks
+// Function to add lights to all interactive artworks
 function addArtworkLights(artworksData) {
   // Check if artworksData is defined, otherwise use the global artworks array
   const artworkItems = artworksData || artworks;
@@ -558,18 +622,17 @@ function addArtworkLights(artworksData) {
       // Create a point light for this artwork
       const artworkLight = new THREE.PointLight(0xffffff, 100, 5, 2);
       
-      // Position light relative to the artwork
+      // Initial position - will be updated in the animation loop to follow rotation
       artworkLight.position.set(
         artworkData.position.x, 
-        artworkData.position.y + 1, // Position slightly above artwork
+        artworkData.position.y,
         artworkData.position.z
       );
       
-      // Add additional properties to the light (optional)
+      // Add additional properties to the light
       artworkLight.userData = {
         artworkIndex: index,
         artworkName: artworkData.name,
-        // You can add custom lighting properties per artwork
         pulseSpeed: 0.003 + (index * 0.001), // Different pulse speed for each artwork
         minIntensity: 80,
         maxIntensity: 150
@@ -577,68 +640,77 @@ function addArtworkLights(artworksData) {
       
       // Add the light to the scene
       scene.add(artworkLight);
-
-    // Create helper for this light
-    const artworkLightHelper = new THREE.PointLightHelper(artworkLight, 1);
-    scene.add(artworkLightHelper);
-    lightHelpers.push(artworkLightHelper);
-    
-    // Store reference to both light and helper
-    window.artworkLights.push({
-      light: artworkLight,
-      helper: artworkLightHelper,
-      artworkIndex: index
+      
+      // Create helper for this light
+      const artworkLightHelper = new THREE.PointLightHelper(artworkLight, 1);
+      scene.add(artworkLightHelper);
+      lightHelpers.push(artworkLightHelper);
+      
+      // Store reference to both light and helper
+      window.artworkLights.push({
+        light: artworkLight,
+        helper: artworkLightHelper,
+        artworkIndex: index
+      });
+      
+      console.log(`Artwork light added for: ${artworkData.name} (index: ${index})`);
     });
     
-    console.log(`Artwork light added for: ${artworkData.name} (index: ${index})`);
-  });
+    console.log(`Created lights for ${window.artworkLights.length} artworks`);
+  } else {
+    console.log("No artwork data available for lights");
+  }
   
-  console.log(`Created lights for ${window.artworkLights.length} artworks`);
-} else {
-  console.log("No artwork data available for lights");
+  // Hide all helpers initially
+  lightHelpers.forEach(helper => {
+    helper.visible = false;
+  });
 }
 
-// Hide all helpers initially
-lightHelpers.forEach(helper => {
-  helper.visible = false;
-});
-}
-
+// Function to update artwork lights with proper rotation handling
 function updateArtworkLights(time) {
   if (window.artworkLights && window.artworkLights.length > 0) {
     window.artworkLights.forEach(item => {
       if (artworks[item.artworkIndex] && interactiveModels[item.artworkIndex]) {
-        const artworkPos = interactiveModels[item.artworkIndex].position;
+        const artworkModel = interactiveModels[item.artworkIndex];
         const light = item.light;
         
-        // Position light relative to the artwork
-        light.position.set(
-          artworkPos.x, 
-          artworkPos.y + 2, 
-          artworkPos.z + 1
-        );
+        // Create an offset vector for the light position relative to the artwork
+        // This defines where the light should be relative to the artwork in local space
+        const localOffset = new THREE.Vector3(0, 2, 1); // 2 units above the artwork
+        
+        // Create a world position vector for the artwork
+        const artworkPos = new THREE.Vector3();
+        artworkModel.getWorldPosition(artworkPos);
+        
+        // Apply the artwork's rotation to the offset vector
+        // This creates a new vector that properly accounts for the artwork's rotation
+        const worldOffset = localOffset.clone().applyQuaternion(artworkModel.quaternion);
+        
+        // Add the rotated offset to the artwork's position to get the final light position
+        light.position.copy(artworkPos).add(worldOffset);
         
         // Check if this specific artwork is being hovered
         let isThisArtworkHovered = false;
         
         // Only check hover if we're not in pointer lock mode
         if (!mouseEnabled && document.body.style.cursor === 'pointer') {
-          // We're hovering something, let's see if it's this artwork
           raycaster.setFromCamera(mouse, camera);
           const intersects = raycaster.intersectObjects(interactiveModels, true);
           
           if (intersects.length > 0) {
+            // Find what artwork we hit
             let hitObject = intersects[0].object;
             let hitModel = hitObject;
             
-            // Find the top-level model
-            while (hitModel.parent && !hitModel.parent.userData.isInteractiveModel) {
+            // Go up the parent hierarchy until we find the interactive model
+            while (hitModel && hitModel.parent && !hitModel.userData.isInteractiveModel) {
               hitModel = hitModel.parent;
             }
             
-            // If we found a parent with isInteractiveModel
-            if (hitModel.parent && hitModel.parent.userData.isInteractiveModel) {
-              const hitIndex = interactiveModels.indexOf(hitModel.parent);
+            // Check if this is the model our light is associated with
+            if (hitModel && hitModel.userData.isInteractiveModel) {
+              const hitIndex = interactiveModels.indexOf(hitModel);
               isThisArtworkHovered = (hitIndex === item.artworkIndex);
             }
           }
@@ -657,7 +729,6 @@ function updateArtworkLights(time) {
           // Normal state (not being hovered)
           light.intensity = light.userData?.minIntensity || 100;
           light.distance = 5;
-          light.color.set(0xffffff); // Reset to white
         }
         
         // Update helper position
